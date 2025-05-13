@@ -1,26 +1,34 @@
 <?php
+session_start();
 include 'db.php';
 
-$email = $_GET['email'] ?? '';
-$token = $_GET['token'] ?? '';
+if (isset($_GET['token'])) {
+    $token = $_GET['token'];
 
-if (empty($email) || empty($token)) {
-    die("❌ Thiếu thông tin xác thực.");
-}
+    // Kiểm tra token trong cơ sở dữ liệu
+    $stmt = $conn->prepare("SELECT * FROM users WHERE verify_token = ?");
+    $stmt->bind_param("s", $token);
+    $stmt->execute();
+    $res = $stmt->get_result();
 
-$stmt = $conn->prepare("SELECT * FROM users WHERE email = ? AND verify_token = ?");
-$stmt->bind_param("ss", $email, $token);
-$stmt->execute();
-$result = $stmt->get_result();
+    if ($res->num_rows === 1) {
+        $user = $res->fetch_assoc();
 
-if ($result->num_rows === 1) {
-    // Cập nhật trạng thái xác minh
-    $update = $conn->prepare("UPDATE users SET is_verified = 1, verify_token = NULL WHERE email = ?");
-    $update->bind_param("s", $email);
-    $update->execute();
+        // Cập nhật trạng thái người dùng
+        $update = $conn->prepare("UPDATE users SET is_verified = 1 WHERE verify_token = ?");
+        $update->bind_param("s", $token);
+        $update->execute();
 
-    echo "✅ Tài khoản đã được kích hoạt thành công. Bạn có thể <a href='index.php'>đăng nhập tại đây</a>.";
-} else {
-    echo "❌ Link không hợp lệ hoặc đã được sử dụng.";
+        // Đăng nhập người dùng và chuyển hướng
+        $_SESSION['user'] = [
+            'email' => $user['email'],
+            'name' => $user['display_name']
+        ];
+        echo "Tài khoản của bạn đã được kích hoạt. Bạn sẽ được chuyển hướng đến trang chủ.";
+        header("Location: home.php");
+        exit;
+    } else {
+        echo "Token không hợp lệ hoặc đã hết hạn.";
+    }
 }
 ?>

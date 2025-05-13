@@ -1,148 +1,144 @@
-<?php
-session_start();
-
-// Nếu chưa đăng nhập, chuyển về index.php
-if (!isset($_SESSION['user'])) {
-    header("Location: index.php");
-    exit;
-}
-?>
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <title>Ghi chú của tôi</title>
-    <link rel="stylesheet" href="style.css">
-    <style>
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            transition: background-color 0.3s, color 0.3s;
-        }
-
-        .main {
-            max-width: 800px;
-            margin: 40px auto;
-            padding: 20px;
-        }
-
-        textarea {
-            width: 100%;
-            height: 300px;
-            padding: 15px;
-            border-radius: 5px;
-            border: none;
-            resize: vertical;
-            transition: all 0.3s ease;
-        }
-
-        .controls {
-            margin-top: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        label {
-            font-size: 14px;
-        }
-
-        .dark-mode {
-            background-color: #121212;
-            color: #f0f0f0;
-        }
-
-        .dark-mode textarea {
-            background-color: #1e1e1e;
-            color: white;
-        }
-
-        .light-mode {
-            background-color: #f5f5f5;
-            color: #222;
-        }
-
-        .light-mode textarea {
-            background-color: white;
-            color: black;
-        }
-
-        select, input[type="color"] {
-            margin-top: 5px;
-        }
-
-        .logout-link {
+  <meta charset="UTF-8">
+  <title>Ghi chú tự động lưu</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .note-card {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 15px;
+      background-color: #fffefc;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+    .note-container {
+      display: flex;
+      flex-wrap: wrap;
+    }
+    .note-item {
+      margin: 10px;
+    }
+    .grid-view .note-item {
+      width: calc(33.333% - 20px);
+    }
+    .list-view .note-item {
+      width: 100%;
+    }
+    .note-title {
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    
+    @media (max-width: 768px) {
+      .grid-view .note-item {
+        width: calc(50% - 20px);
+      }
+    }
+    @media (max-width: 576px) {
+      .grid-view .note-item {
+        width: 100%;
+      }
+    .logout-link {
             margin-top: 15px;
             display: inline-block;
         }
-    </style>
+    }
+  </style>
 </head>
-<body class="light-mode">
-
-
-
-<div class="main">
-    <h2>👋 Xin chào, <?php echo $_SESSION['user']['name']; ?>!</h2>
-    <p>Đây là nơi bạn có thể viết ghi chú và tùy chỉnh giao diện.</p>
-
-    <body>
-    <div style="position: absolute; top: 10px; right: 10px;">
-        <a href="profile.php" style="padding: 8px 12px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px;">View Profile</a>
-    </div>
-    <!-- Phần còn lại của home.php -->
-
-
-    <textarea id="noteArea" placeholder="Viết ghi chú tại đây..."></textarea>
-
-    <div class="controls">
-        <label>
-            Kích thước chữ:
-            <select id="fontSizeSelect">
-                <option value="14px">Nhỏ</option>
-                <option value="16px" selected>Vừa</option>
-                <option value="20px">Lớn</option>
-            </select>
-        </label>
-
-        <label>
-            Màu nền ghi chú:
-            <input type="color" id="bgColorPicker" value="#ffffff">
-        </label>
-
-        <label>
-            Chủ đề:
-            <select id="themeToggle">
-                <option value="light">Sáng</option>
-                <option value="dark">Tối</option>
-            </select>
-        </label>
+<body class="bg-light">
+  <div class="container py-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="fw-bold">Ghi Chú</h2>
+      <div>
+        <button id="gridBtn" class="btn btn-outline-primary btn-sm me-2 active">Dạng Lưới</button>
+        <button id="listBtn" class="btn btn-outline-secondary btn-sm">Dạng Danh Sách</button>
+        <button id="addNoteBtn" class="btn btn-success btn-sm ms-3">+ Thêm Ghi Chú</button>
+      </div>
     </div>
 
-    <a class="logout-link" href="logout.php">🚪 Đăng xuất</a>
-</div>
+    <div id="noteContainer" class="note-container grid-view"></div>
+  </div>
 
+  <a class="logout-link" href="logout.php">🚪 Đăng xuất</a>
 
+  <script>
+    const noteContainer = document.getElementById('noteContainer');
+    const gridBtn = document.getElementById('gridBtn');
+    const listBtn = document.getElementById('listBtn');
+    const addNoteBtn = document.getElementById('addNoteBtn');
 
-<script>
-    const noteArea = document.getElementById('noteArea');
-    const fontSizeSelect = document.getElementById('fontSizeSelect');
-    const bgColorPicker = document.getElementById('bgColorPicker');
-    const themeToggle = document.getElementById('themeToggle');
+    let notes = JSON.parse(localStorage.getItem('notes')) || [];
 
-    fontSizeSelect.addEventListener('change', function() {
-        noteArea.style.fontSize = this.value;
+    function saveNotes() {
+      localStorage.setItem('notes', JSON.stringify(notes));
+    }
+
+    function createNoteElement(note, index) {
+      const div = document.createElement('div');
+      div.className = 'note-item';
+
+      const card = document.createElement('div');
+      card.className = 'note-card';
+
+      const titleInput = document.createElement('input');
+      titleInput.className = 'form-control mb-2 fw-bold';
+      titleInput.placeholder = 'Tiêu đề...';
+      titleInput.value = note.title;
+      titleInput.addEventListener('input', () => {
+        notes[index].title = titleInput.value;
+        saveNotes();
+      });
+
+      const contentInput = document.createElement('textarea');
+      contentInput.className = 'form-control';
+      contentInput.placeholder = 'Nội dung ghi chú...';
+      contentInput.rows = 4;
+      contentInput.value = note.content;
+      contentInput.addEventListener('input', () => {
+        notes[index].content = contentInput.value;
+        saveNotes();
+      });
+
+      card.appendChild(titleInput);
+      card.appendChild(contentInput);
+      div.appendChild(card);
+      return div;
+    }
+
+    function renderNotes() {
+      noteContainer.innerHTML = '';
+      notes.forEach((note, index) => {
+        const noteEl = createNoteElement(note, index);
+        noteContainer.appendChild(noteEl);
+      });
+    }
+
+    // Thêm ghi chú mới
+    addNoteBtn.addEventListener('click', () => {
+      notes.unshift({ title: '', content: '' });
+      saveNotes();
+      renderNotes();
     });
 
-    bgColorPicker.addEventListener('input', function() {
-        noteArea.style.backgroundColor = this.value;
+    // Chuyển đổi dạng xem
+    gridBtn.addEventListener('click', () => {
+      noteContainer.classList.add('grid-view');
+      noteContainer.classList.remove('list-view');
+      gridBtn.classList.add('active');
+      listBtn.classList.remove('active');
     });
 
-    themeToggle.addEventListener('change', function() {
-        document.body.className = this.value + '-mode';
+    listBtn.addEventListener('click', () => {
+      noteContainer.classList.add('list-view');
+      noteContainer.classList.remove('grid-view');
+      listBtn.classList.add('active');
+      gridBtn.classList.remove('active');
     });
-</script>
 
-
+    // Lần đầu load
+    renderNotes();
+  </script>
 </body>
 </html>
